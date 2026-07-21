@@ -7,17 +7,28 @@ import Board from './components/board/Board'
 import GameInfo from './components/game-info/GameInfo'
 import GameCounter from './components/game-counter/GameCounter'
 import TurnTimer from './components/turn-timer/TurnTimer'
+import GameSetup from './components/game-setup/GameSetup'
 
 const TURN_DURATION = 10
+
+const DEFAULT_PLAYERS = [
+  { name: 'Player 1', symbol: 'X' },
+  { name: 'Player 2', symbol: 'O' },
+]
+
+const createEmptyBoard = (boardSize) => Array(boardSize * boardSize).fill(null)
 
 class Game extends React.Component {
   constructor(props) {
     super(props)
     const savedGamesPlayed = localStorage.getItem('totalGamesPlayed')
+    const boardSize = 3
     this.state = {
+      boardSize,
+      players: DEFAULT_PLAYERS.map((player) => ({ ...player })),
       history: [
         {
-          squares: Array(9).fill(null),
+          squares: createEmptyBoard(boardSize),
         },
       ],
       stepNumber: 0,
@@ -52,16 +63,16 @@ class Game extends React.Component {
     }
   }
 
-  isGameOver(squares) {
-    const result = calculateWinner(squares)
+  isGameOver(squares, boardSize) {
+    const result = calculateWinner(squares, boardSize)
     const isBoardFull = squares.every((square) => square !== null)
     return Boolean(result) || isBoardFull
   }
 
   tickTurnTimer() {
-    const history = this.state.history
-    const current = history[this.state.stepNumber]
-    if (this.isGameOver(current.squares)) {
+    const { history, stepNumber, boardSize } = this.state
+    const current = history[stepNumber]
+    if (this.isGameOver(current.squares, boardSize)) {
       return
     }
 
@@ -81,10 +92,13 @@ class Game extends React.Component {
     const history = this.state.history.slice(0, this.state.stepNumber + 1)
     const current = history[history.length - 1]
     const squares = current.squares.slice()
-    if (calculateWinner(squares) || squares[i]) {
+    const { boardSize, players, xIsNext } = this.state
+
+    if (calculateWinner(squares, boardSize) || squares[i]) {
       return
     }
-    squares[i] = this.state.xIsNext ? 'X' : 'O'
+
+    squares[i] = xIsNext ? players[0].symbol : players[1].symbol
     this.setState({
       history: history.concat([
         {
@@ -92,16 +106,32 @@ class Game extends React.Component {
         },
       ]),
       stepNumber: history.length,
-      xIsNext: !this.state.xIsNext,
+      xIsNext: !xIsNext,
       timeLeft: TURN_DURATION,
     })
   }
 
   jumpTo(step) {
-    console.log(step)
     this.setState({
       stepNumber: step,
       xIsNext: step % 2 === 0,
+      lastGameWinner: null,
+      timeLeft: TURN_DURATION,
+    })
+  }
+
+  applySetup(config) {
+    const boardSize = config.boardSize
+    this.setState({
+      boardSize,
+      players: config.players.map((player) => ({ ...player })),
+      history: [
+        {
+          squares: createEmptyBoard(boardSize),
+        },
+      ],
+      stepNumber: 0,
+      xIsNext: true,
       lastGameWinner: null,
       timeLeft: TURN_DURATION,
     })
@@ -122,49 +152,51 @@ class Game extends React.Component {
   }
 
   render() {
-    const history = this.state.history
-    const current = history[this.state.stepNumber]
-    const result = calculateWinner(current.squares)
+    const { boardSize, players, history, stepNumber, xIsNext, darkMode, totalGamesPlayed, timeLeft } = this.state
+    const current = history[stepNumber]
+    const result = calculateWinner(current.squares, boardSize)
     const winner = result ? result.winner : null
     const winningIndices = result ? result.indices : []
-    
+
     // Check if game is completed (winner or draw)
     const isBoardFull = current.squares.every(square => square !== null)
-    const isGameCompleted = winner || isBoardFull
-    
+    const isGameCompleted = Boolean(winner) || isBoardFull
+    const isDraw = !winner && isBoardFull
+
     // Increment counter only when game transitions from incomplete to complete
     if (isGameCompleted && this.state.lastGameWinner !== winner && !this.state.lastGameWinner) {
       this.incrementGamesPlayed()
       this.setState({ lastGameWinner: winner || 'draw' })
     }
-    
-    let status
-    if (winner) {
-      status = 'Winner: ' + winner
-    } else {
-      status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O')
-    }
+
     return (
       <React.Fragment>
         <button
           className="theme-toggle"
           onClick={() => this.toggleDarkMode()}
-          title={this.state.darkMode ? 'Light Mode' : 'Dark Mode'}
+          title={darkMode ? 'Light Mode' : 'Dark Mode'}
         >
-          {this.state.darkMode ? '☀️' : '🌙'}
+          {darkMode ? '☀️' : '🌙'}
         </button>
-        <main className={this.state.darkMode ? 'dark-mode' : ''}>
+        <main className={darkMode ? 'dark-mode' : ''}>
           <h1>Tic Tac Toe</h1>
-          <GameCounter totalGamesPlayed={this.state.totalGamesPlayed} />
-          <TurnTimer timeLeft={this.state.timeLeft} isActive={!isGameCompleted} />
+          <GameCounter totalGamesPlayed={totalGamesPlayed} />
+          <TurnTimer timeLeft={timeLeft} isActive={!isGameCompleted} />
+          <GameSetup
+            key={`${boardSize}-${players[0].name}-${players[0].symbol}-${players[1].name}-${players[1].symbol}`}
+            config={{ boardSize, players }}
+            onApply={(config) => this.applySetup(config)}
+          />
           <section className="game">
             <GameInfo
-              status={status}
               winner={winner}
-              xIsNext={this.state.xIsNext}
+              isDraw={isDraw}
+              xIsNext={xIsNext}
+              players={players}
             />
             <Board
               squares={current.squares}
+              boardSize={boardSize}
               onClick={(i) => this.handleClick(i)}
               jumpTo={(i) => this.jumpTo(i)}
               winningIndices={winningIndices}

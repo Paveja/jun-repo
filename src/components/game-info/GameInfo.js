@@ -1,18 +1,31 @@
 import Friends from '../../assets/images/friends.webp'
 
-const GameInfo = ({ status, winner, xIsNext }) => {
+const GameInfo = ({ winner, isDraw, xIsNext, players }) => {
+  const currentPlayer = xIsNext ? players[0] : players[1]
+  const winnerPlayer = winner
+    ? players.find((player) => player.symbol === winner)
+    : null
+
+  let message
+  let messageClass = xIsNext ? 'player-x' : 'player-o'
+
+  if (winnerPlayer) {
+    message = `${winnerPlayer.name} (${winnerPlayer.symbol}) wins!`
+    messageClass = winnerPlayer === players[0] ? 'player-x' : 'player-o'
+  } else if (isDraw) {
+    message = "It's a draw!"
+    messageClass = 'player-x'
+  } else {
+    message = `Your turn, ${currentPlayer.name} (${currentPlayer.symbol})`
+  }
+
   return (
     <section className="game-information">
-      {xIsNext && !winner ? (
-        <h3 className="player-x">It's your turn, player X</h3>
-      ) : !xIsNext && !winner ? (
-        <h3 className="player-o">Now you, player O! </h3>
-      ) : winner && status === 'Winner: X' ? (
-        <h3 className="player-x">Nice! I won! </h3>
-      ) : (
-        <h3 className="player-o">Wohoo! I made it!</h3>
-      )}
-      <img src={Friends} alt="Player X and Player O" />
+      <h3 className={messageClass}>{message}</h3>
+      <img
+        src={Friends}
+        alt={`${players[0].name} vs ${players[1].name}`}
+      />
     </section>
   )
 }
