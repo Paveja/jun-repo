@@ -6,6 +6,9 @@ import calculateWinner from './helpers/calculateWinner'
 import Board from './components/board/Board'
 import GameInfo from './components/game-info/GameInfo'
 import GameCounter from './components/game-counter/GameCounter'
+import TurnTimer from './components/turn-timer/TurnTimer'
+
+const TURN_DURATION = 10
 
 class Game extends React.Component {
   constructor(props) {
@@ -22,7 +25,56 @@ class Game extends React.Component {
       darkMode: false,
       totalGamesPlayed: savedGamesPlayed ? parseInt(savedGamesPlayed, 10) : 0,
       lastGameWinner: null,
+      timeLeft: TURN_DURATION,
     }
+    this.timerId = null
+  }
+
+  componentDidMount() {
+    this.startTurnTimer()
+  }
+
+  componentWillUnmount() {
+    this.clearTurnTimer()
+  }
+
+  startTurnTimer() {
+    this.clearTurnTimer()
+    this.timerId = setInterval(() => {
+      this.tickTurnTimer()
+    }, 1000)
+  }
+
+  clearTurnTimer() {
+    if (this.timerId !== null) {
+      clearInterval(this.timerId)
+      this.timerId = null
+    }
+  }
+
+  isGameOver(squares) {
+    const result = calculateWinner(squares)
+    const isBoardFull = squares.every((square) => square !== null)
+    return Boolean(result) || isBoardFull
+  }
+
+  tickTurnTimer() {
+    const history = this.state.history
+    const current = history[this.state.stepNumber]
+    if (this.isGameOver(current.squares)) {
+      return
+    }
+
+    this.setState((prevState) => {
+      if (prevState.timeLeft <= 1) {
+        // Time expired: skip the current player's turn without placing a mark
+        return {
+          xIsNext: !prevState.xIsNext,
+          timeLeft: TURN_DURATION,
+        }
+      }
+      return { timeLeft: prevState.timeLeft - 1 }
+    })
   }
 
   handleClick(i) {
@@ -41,6 +93,7 @@ class Game extends React.Component {
       ]),
       stepNumber: history.length,
       xIsNext: !this.state.xIsNext,
+      timeLeft: TURN_DURATION,
     })
   }
 
@@ -50,6 +103,7 @@ class Game extends React.Component {
       stepNumber: step,
       xIsNext: step % 2 === 0,
       lastGameWinner: null,
+      timeLeft: TURN_DURATION,
     })
   }
 
@@ -102,6 +156,7 @@ class Game extends React.Component {
         <main className={this.state.darkMode ? 'dark-mode' : ''}>
           <h1>Tic Tac Toe</h1>
           <GameCounter totalGamesPlayed={this.state.totalGamesPlayed} />
+          <TurnTimer timeLeft={this.state.timeLeft} isActive={!isGameCompleted} />
           <section className="game">
             <GameInfo
               status={status}
